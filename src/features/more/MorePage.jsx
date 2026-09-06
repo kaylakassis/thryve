@@ -9,8 +9,10 @@ import { useAuth } from '../../lib/auth.jsx';
 import { useUserContext } from '../../lib/userContext.jsx';
 import { isNative } from '../../lib/platform.js';
 
-// Tabs already on the bottom bar - never repeated here.
-export const NATIVE_TAB_IDS = new Set(['dashboard', 'calendar', 'finance', 'ivy']);
+// The sidebar's sections, complete - Run / Money / Grow / Tools - so the
+// phone shows the same map of the product as the desktop. An item that
+// is also on the tab bar (Calendar, Finance) still appears in its section;
+// only the two pinned, section-less tabs (Home, Ivy) are left out.
 const SECTION_ORDER = ['Run', 'Money', 'Grow', 'Tools'];
 
 function initialsOf(user) {
@@ -27,7 +29,7 @@ export default function MorePage() {
     isSuperAdmin: user?.isSuperAdmin,
     businessType: ctx?.owns?.businessType || 'both',
     hiddenNav: user?.ui_prefs?.hiddenNav,
-  }).filter((i) => !NATIVE_TAB_IDS.has(i.id));
+  }).filter((i) => i.section || i.superAdminOnly);
 
   const groups = SECTION_ORDER
     .map((s) => ({ label: s, items: items.filter((i) => i.section === s) }))
