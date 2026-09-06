@@ -12,6 +12,7 @@ import AppShell from './components/layout/AppShell.jsx';
 import ViewToggle from './components/ViewToggle.jsx';
 import PWAPrompts from './components/PWAPrompts.jsx';
 import NativeAppLock from './components/NativeAppLock.jsx';
+import LaunchVeil from './lib/launchVeil.jsx';
 import RequireAuth from './features/auth/RequireAuth.jsx';
 import AuthPage from './features/auth/AuthPage.jsx';
 import EarlyAccessGate from './features/auth/EarlyAccessGate.jsx';
@@ -327,6 +328,7 @@ export default function App() {
     </Suspense>
     <ViewToggle/>
     {isNative() && <NativeAppLock/>}
+    {isNative() && <LaunchVeil/>}
     {/* "Add Ivy to your home screen" prompts are for Safari visitors. In the
         native app the user is already there, so never mount them. */}
     {!isNative() && <PWAPrompts/>}

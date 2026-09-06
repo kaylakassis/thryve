@@ -12,8 +12,16 @@ export default function RequireAuth({ children }) {
   const location = useLocation();
 
   if (loading) {
-    // Native: keep the launch frame up so the splash continues seamlessly.
-    if (isNative()) return <LaunchFrame/>;
+    // Native: a device that remembers a session shows the app immediately
+    // and lets /auth/me confirm behind it - the home screen's own requests
+    // go out in parallel with the session check instead of after it. If
+    // the check fails, the redirect below fires. No hint → hold the veil.
+    if (isNative()) {
+      let hint = false;
+      try { hint = localStorage.getItem('ivy_signed_in') === '1'; } catch { /* private mode */ }
+      if (hint) return children;
+      return <LaunchFrame/>;
+    }
     return (
       <div className={`app-root dir-${tweaks.direction}`} style={{
         minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -25,7 +33,7 @@ export default function RequireAuth({ children }) {
   }
 
   if (!user) {
-    return <Navigate to="/signin" replace state={{ from: location.pathname }} />;
+    return <Navigate to={isNative() ? '/welcome' : '/signin'} replace state={{ from: location.pathname }} />;
   }
 
   return children;

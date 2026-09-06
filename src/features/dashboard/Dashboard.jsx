@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
+import { readCache, writeCache } from '../../lib/deviceCache.js';
 import { Link, useNavigate } from 'react-router-dom';
 import { Icons } from '../../components/Icons.jsx';
 import EmptyNote from '../../components/EmptyNote.jsx';
@@ -438,14 +439,16 @@ function GoalsMomentum({ goals, currency }) {
 }
 
 export default function Dashboard() {
-  const [data, setData] = useState(null);
+  // Native: paint yesterday's numbers instantly from the device cache and
+  // refresh underneath - the fetch below replaces them within a second.
+  const [data, setData] = useState(() => readCache('dashboard'));
   const [loadErr, setLoadErr] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(() => !readCache('dashboard'));
   const { ctx } = useUserContext();
   const businessType = ctx?.owns?.businessType || 'both';
 
   const loadDashboard = useCallback(async () => {
-    try { const r = await api.get('/dashboard'); setData(r); setLoadErr(null); }
+    try { const r = await api.get('/dashboard'); setData(r); setLoadErr(null); writeCache('dashboard', r); }
     catch (e) {
       // A failed fetch must NOT masquerade as an empty business - on
       // flaky mobile connections "No appointments / $0" reads as "my

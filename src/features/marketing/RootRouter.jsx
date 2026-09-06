@@ -66,7 +66,7 @@ export default function RootRouter() {
 
   // Logged-in: bounce to the right surface. A remembered landing sends the
   // user on right away; RoleRouter re-verifies with the same cached /me.
-  const landing = decision || (user ? remembered : null);
+  const landing = decision || ((user || (native && hasSessionHint)) ? remembered : null);
   if (landing === 'onboarding') return <Navigate to={{ pathname: '/onboarding', search: window.location.search }} replace/>;
   if (landing === 'client')     return <Navigate to={{ pathname: '/me', search: window.location.search }} replace/>;
   if (landing === 'business')   return <Navigate to={{ pathname: '/dashboard', search: window.location.search }} replace/>;

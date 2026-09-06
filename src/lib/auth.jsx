@@ -4,6 +4,7 @@ import { api } from './api.js';
 import { isNative } from './platform.js';
 import { setNativeAuthToken, clearNativeAuthToken } from './nativeAuth.js';
 import { clearMeCache, forgetLanding } from './landing.js';
+import { clearDeviceCache } from './deviceCache.js';
 import { CURRENT_TERMS_VERSION, CURRENT_PRIVACY_VERSION } from './legal.js';
 
 const Ctx = createContext(null);
@@ -56,7 +57,7 @@ export function AuthProvider({ children }) {
       mfaTokenRef.current = r.mfaToken || null;
       return { mfaRequired: true };
     }
-    clearMeCache();
+    clearMeCache(); clearDeviceCache();
     setUser(r.user);
     stampSessionHint(true);
     return r.user;
@@ -70,7 +71,7 @@ export function AuthProvider({ children }) {
     });
     if (isNative() && r?.token) await setNativeAuthToken(r.token);
     mfaTokenRef.current = null;
-    clearMeCache();
+    clearMeCache(); clearDeviceCache();
     setUser(r.user);
     stampSessionHint(true);
     return r.user;
@@ -101,7 +102,7 @@ export function AuthProvider({ children }) {
     // up, or a shared device) would make RoleRouter wrongly bypass the
     // wizard. Clear it at account creation so a fresh owner always onboards.
     try { localStorage.removeItem('ivy_skip_onboarding_until'); } catch { /* private mode */ }
-    clearMeCache();
+    clearMeCache(); clearDeviceCache();
     setUser(r.user);
     stampSessionHint(true);
     return r;
@@ -118,7 +119,7 @@ export function AuthProvider({ children }) {
       stampSessionHint(false);
       // Forget this account's role answer and remembered landing so the next
       // sign-in on this device starts from a clean slate.
-      clearMeCache(); forgetLanding();
+      clearMeCache(); forgetLanding(); clearDeviceCache();
       // Don't let a per-browser onboarding-skip flag leak into whoever signs
       // in next on this device (e.g. after an account deletion).
       try { localStorage.removeItem('ivy_skip_onboarding_until'); } catch { /* private mode */ }

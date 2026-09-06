@@ -10,6 +10,7 @@
 //   • the last decision is remembered on the device, so the next launch
 //     navigates immediately and the fresh /me only has to confirm it.
 import { api } from './api.js';
+import { writeCache } from './deviceCache.js';
 
 const TTL_MS = 15_000;
 const LANDING_KEY = 'ivy_landing';
@@ -21,10 +22,12 @@ let cache = null; // { promise, at }
 export function fetchMe({ force = false } = {}) {
   const now = Date.now();
   if (!force && cache && now - cache.at < TTL_MS) return cache.promise;
-  const promise = api.get('/me').catch((e) => {
-    if (cache?.promise === promise) cache = null;
-    throw e;
-  });
+  const promise = api.get('/me')
+    .then((r) => { writeCache('me', r); return r; })
+    .catch((e) => {
+      if (cache?.promise === promise) cache = null;
+      throw e;
+    });
   cache = { promise, at: now };
   return promise;
 }

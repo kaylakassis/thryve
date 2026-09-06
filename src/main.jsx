@@ -31,7 +31,7 @@ if (typeof window !== 'undefined') {
   window.addEventListener('unhandledrejection', (e) => {
     if (tryStaleChunkRecovery(e?.reason)) return;
     // eslint-disable-next-line no-console
-    console.error('[unhandledrejection]', e?.reason);
+    console.error('[unhandledrejection]', e?.reason?.message || '', e?.reason);
   });
   window.addEventListener('error', (e) => {
     if (tryStaleChunkRecovery(e?.error || { message: e?.message })) return;

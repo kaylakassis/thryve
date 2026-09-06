@@ -13,6 +13,12 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="format-detection" content="telephone=no" />
+  <!-- Paint the ground BEFORE the stylesheet arrives: the web view is white
+       until CSS applies, and that white frame is visible on a phone. Inside
+       the native app the ground is the launch-screen green so splash, veil
+       and first paint are one continuous colour. -->
+  <style>html{background:#0E100F}</style>
+  <script>try{if(window.Capacitor&&window.Capacitor.isNativePlatform&&window.Capacitor.isNativePlatform())document.documentElement.style.background='#042b25'}catch(e){}</script>
   <link rel="manifest" href="/manifest.webmanifest" />
   <link rel="icon" type="image/png" sizes="512x512" href="/icon-512.png" />
   <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />

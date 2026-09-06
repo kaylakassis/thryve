@@ -9,12 +9,15 @@
 // provider supplied it.
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import { fetchMe } from './landing.js';
+import { readCache } from './deviceCache.js';
 
 const Ctx = createContext({ ctx: null, loading: true, error: null, refresh: () => {} });
 
 export function UserContextProvider({ children }) {
-  const [ctx, setCtx] = useState(null);
-  const [loading, setLoading] = useState(true);
+  // Native: start from the last-known /me so the shell (name, workspace,
+  // subscription state) paints at once; the fresh answer replaces it.
+  const [ctx, setCtx] = useState(() => readCache('me'));
+  const [loading, setLoading] = useState(() => !readCache('me'));
   const [error, setError] = useState(null);
 
   const refresh = useCallback(async () => {

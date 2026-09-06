@@ -5,6 +5,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Icons } from './Icons.jsx';
 import { api } from '../lib/api.js';
+import { clearDeviceCache } from '../lib/deviceCache.js';
 import { isNative } from '../lib/platform.js';
 import { clearNativeAuthToken } from '../lib/nativeAuth.js';
 import { biometricUnlock, biometryInfo, isLockEnabled } from '../lib/biometric.js';
@@ -51,6 +52,7 @@ export default function NativeAppLock() {
     try { await api.post('/auth/logout', {}); } catch { /* clearing locally is what matters */ }
     try { await clearNativeAuthToken(); } catch { /* ignore */ }
     try { localStorage.removeItem('ivy_signed_in'); } catch { /* ignore */ }
+    clearDeviceCache();
     setLocked(false); setBusy(false);
     navigate('/signin', { replace: true });
   };
@@ -65,7 +67,7 @@ export default function NativeAppLock() {
       fontFamily: 'var(--font-sans, Inter, -apple-system, sans-serif)', textAlign: 'center',
     }}>
       <div style={{
-        width: 96, height: 96, borderRadius: 24, overflow: 'hidden', background: '#042b25',
+        width: 132, height: 132, borderRadius: 30, overflow: 'hidden', background: '#042b25',
         boxShadow: '0 24px 60px -20px rgba(0,0,0,.6), 0 0 0 1px rgba(255,255,255,.08)',
       }}>
         <img src="/icon-512.png" alt="" draggable="false" style={{ width: '100%', height: '100%', display: 'block' }}/>
