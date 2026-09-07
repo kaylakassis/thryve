@@ -16,11 +16,15 @@
 import { isNative } from './platform.js';
 import { api } from './api.js';
 
+// Resolves to the MODULE, never the PushNotifications proxy itself. A
+// Capacitor plugin proxy turns every property lookup into a native call,
+// so resolving a promise with it makes the engine ask for `.then` and
+// iOS answers "PushNotifications.then() is not implemented" - the
+// unhandled rejection that showed in the Xcode console on every launch.
+// Same rule as nativeAuth.prefs(): hand the module through, unwrap after.
 let pluginPromise = null;
 function plugin() {
-  if (!pluginPromise) {
-    pluginPromise = import('@capacitor/push-notifications').then((m) => m.PushNotifications);
-  }
+  if (!pluginPromise) pluginPromise = import('@capacitor/push-notifications');
   return pluginPromise;
 }
 
@@ -33,7 +37,7 @@ export function nativePushSupported() {
 export async function nativePermissionState() {
   if (!isNative()) return 'unsupported';
   try {
-    const P = await plugin();
+    const { PushNotifications: P } = await plugin();
     const { receive } = await P.checkPermissions();
     if (receive === 'granted') return 'granted';
     if (receive === 'denied') return 'denied';
@@ -47,7 +51,7 @@ let listenersBound = false;
 async function bindListeners() {
   if (listenersBound) return;
   listenersBound = true;
-  const P = await plugin();
+  const { PushNotifications: P } = await plugin();
 
   // Fires after successful APNs registration with the device token.
   await P.addListener('registration', async ({ value }) => {
@@ -81,7 +85,7 @@ async function bindListeners() {
 // Throws on denial so callers surface the same guidance as web push.
 export async function registerNativePush() {
   if (!isNative()) throw new Error('Native push is only available in the app');
-  const P = await plugin();
+  const { PushNotifications: P } = await plugin();
   await bindListeners();
   const { receive } = await P.requestPermissions();
   if (receive !== 'granted') throw new Error('Notifications permission was not granted');
@@ -95,7 +99,7 @@ export async function registerNativePush() {
 export async function initNativePushOnLaunch() {
   if (!isNative()) return;
   try {
-    const P = await plugin();
+    const { PushNotifications: P } = await plugin();
     const { receive } = await P.checkPermissions();
     if (receive !== 'granted') return;
     await bindListeners();
@@ -117,7 +121,7 @@ export async function unregisterNativePush() {
       await api.del('/push/device', { token }).catch(() => {});
       try { localStorage.removeItem('ivy_apns_token'); } catch { /* ignore */ }
     }
-    const P = await plugin();
+    const { PushNotifications: P } = await plugin();
     await P.unregister();
   } catch (err) {
     // eslint-disable-next-line no-console
