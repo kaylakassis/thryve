@@ -171,7 +171,7 @@
       "destination": "/blog/:slug.html"
     },
     {
-      "source": "/((?!api/).*)",
+      "source": "/((?!api/|assets/|fonts/).*)",
       "destination": "/index.html"
     }
   ],
