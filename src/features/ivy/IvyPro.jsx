@@ -26,6 +26,16 @@ export default function IvyPro() {
   const [draft, setDraft] = useState('');
   // Mobile: 'chat' | 'history' | 'data' tab. Default to chat.
   const [mobileTab, setMobileTab] = useState('chat');
+  // Today's insight can be closed; it stays closed for the rest of the day.
+  const todayKey = new Date().toISOString().slice(0, 10);
+  const [insightHidden, setInsightHidden] = useState(() => {
+    try { return localStorage.getItem('ivy_insight_hidden') === todayKey; } catch { return false; }
+  });
+  const hideInsight = () => {
+    setInsightHidden(true);
+    try { localStorage.setItem('ivy_insight_hidden', todayKey); } catch { /* private mode */ }
+  };
+
   const scrollRef = useRef(null);
 
   useEffect(() => {
@@ -79,25 +89,37 @@ export default function IvyPro() {
 
   return (
     <div style={{
-      height: isMobile ? 'calc(100vh - 56px - 64px)' : 'calc(100vh - 60px)',
+      // Mobile: the visible height is the viewport minus the status bar, the
+      // 56px header, and the tab bar with the home-indicator inset - so the
+      // composer sits at the bottom of the screen without scrolling.
+      height: isMobile
+        ? 'calc(100dvh - env(safe-area-inset-top, 0px) - 56px - 72px - env(safe-area-inset-bottom, 0px))'
+        : 'calc(100vh - 60px)',
       display: 'grid',
       gridTemplateColumns: cols,
+      gridTemplateRows: isMobile ? 'auto minmax(0, 1fr)' : 'minmax(0, 1fr)',
       overflow: 'hidden',
     }}>
+      {/* Mobile: Chat / History / Data switcher, always visible. */}
+      {isMobile && <MobileTabBar value={mobileTab} onChange={setMobileTab}/>}
+
       {/* LEFT: history */}
       {showHistory && <div style={{
         borderRight: isMobile ? 'none' : '1px solid var(--border)',
         background: 'var(--surface)',
         display: 'flex', flexDirection: 'column', overflow: 'hidden',
       }}>
-        <div style={{ padding: '20px 18px 14px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
-            <SparkBadge direction={direction} size={32}/>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div className="page-title" style={{ fontSize: 17, margin: 0 }}>Ivy</div>
-              <div style={{ fontSize: 11, color: 'var(--muted)' }}>AI assistant</div>
+        <div style={{ padding: isMobile ? '12px 12px 10px' : '20px 18px 14px' }}>
+          {/* The brand row repeats the phone's header, so it is desktop-only. */}
+          {!isMobile && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
+              <SparkBadge direction={direction} size={32}/>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div className="page-title" style={{ fontSize: 17, margin: 0 }}>Ivy</div>
+                <div style={{ fontSize: 11, color: 'var(--muted)' }}>AI assistant</div>
+              </div>
             </div>
-          </div>
+          )}
           {mode && <ModeChip mode={mode} modeError={modeError} model={model}/>}
           {mode === 'live' && usage && <UsageMeter usage={usage}/>}
           <button className="btn btn-primary" onClick={newChat}
@@ -126,13 +148,17 @@ export default function IvyPro() {
       </div>}
 
       {/* CENTER */}
-      {showChat && <div style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'var(--surface-2)' }}>
-        {isMobile && <MobileTabBar value={mobileTab} onChange={setMobileTab}/>}
-        <div style={{ padding: isMobile ? '12px 12px 0' : '24px 24px 0' }}>
-          <InsightBanner context={context} direction={direction} onAct={(t) => { submit(t); if (isMobile) setMobileTab('chat'); }}/>
-        </div>
-
-        <div ref={scrollRef} className="scroll" style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: 24 }}>
+      {showChat && <div style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden', minHeight: 0, background: 'var(--surface-2)' }}>
+        <div ref={scrollRef} className="scroll" style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: isMobile ? '10px 12px 8px' : 24 }}>
+          {/* The insight lives INSIDE the scroll area (it scrolls away rather
+              than covering content) and can be closed for the day. */}
+          {!insightHidden && (
+            <div style={{ maxWidth: 720, margin: isMobile ? '0 0 12px' : '0 auto 16px' }}>
+              <InsightBanner context={context} direction={direction} compact={isMobile}
+                onClose={hideInsight}
+                onAct={(t) => { submit(t); if (isMobile) setMobileTab('chat'); }}/>
+            </div>
+          )}
           {error && (
             <div style={{
               maxWidth: 720, margin: '0 auto 12px',
@@ -144,7 +170,7 @@ export default function IvyPro() {
             </div>
           )}
           {!activeId && messages.length === 0 ? (
-            <WelcomePanel onPrompt={submit} direction={direction} briefing={briefing}/>
+            <WelcomePanel onPrompt={submit} direction={direction} briefing={briefing} compact={isMobile}/>
           ) : (
             <div style={{ maxWidth: 720, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 14 }}>
               {messages.map((m) => (
@@ -162,7 +188,7 @@ export default function IvyPro() {
         </div>
 
         {/* Composer */}
-        <div style={{ padding: '16px 24px 24px', background: 'var(--surface-2)' }}>
+        <div style={{ padding: isMobile ? '6px 12px 10px' : '16px 24px 24px', background: 'var(--surface-2)' }}>
           <div style={{ maxWidth: 720, margin: '0 auto' }}>
             <div style={{
               display: 'flex', alignItems: 'flex-end', gap: 8,
@@ -173,7 +199,7 @@ export default function IvyPro() {
               <textarea value={draft}
                 onChange={(e) => setDraft(e.target.value)}
                 onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submit(); } }}
-                placeholder="Ask Ivy about revenue, retention, pricing, content…"
+                placeholder={isMobile ? 'Ask Ivy anything…' : 'Ask Ivy about revenue, retention, pricing, content…'}
                 rows={1}
                 style={{
                   flex: 1, border: 0, outline: 0, resize: 'none',
@@ -186,9 +212,11 @@ export default function IvyPro() {
                 <Icons.Arrow size={13} sw={2.4}/>
               </button>
             </div>
-            <div style={{ marginTop: 8, fontSize: 11, color: 'var(--muted)', textAlign: 'center' }}>
-              Ivy reads your real Ivy data - clients, finance, calendar - and stays inside this workspace.
-            </div>
+            {!isMobile && (
+              <div style={{ marginTop: 8, fontSize: 11, color: 'var(--muted)', textAlign: 'center' }}>
+                Ivy reads your real Ivy data - clients, finance, calendar - and stays inside this workspace.
+              </div>
+            )}
           </div>
         </div>
       </div>}
@@ -332,39 +360,62 @@ function SessionRow({ session, active, onOpen, onRemove }) {
   );
 }
 
-function InsightBanner({ context, direction, onAct }) {
+function InsightBanner({ context, direction, onAct, onClose, compact = false }) {
   const ctx = context || {};
   const headline = pickInsight(ctx);
   return (
     <div style={{
       position: 'relative', overflow: 'hidden',
-      padding: '18px 20px', borderRadius: 14,
+      padding: compact ? '12px 40px 12px 14px' : '18px 44px 18px 20px', borderRadius: 14,
       background: `linear-gradient(110deg, ${direction === 'bold' ? 'var(--accent)' : '#E8E4F2'}, ${direction === 'bold' ? '#8FE0B4' : '#D5DBF2'})`,
       color: direction === 'bold' ? 'var(--accent-ink)' : '#2D2847',
       display: 'flex', alignItems: 'center', gap: 16,
     }}>
-      <div style={{
-        width: 44, height: 44, borderRadius: 12, flexShrink: 0,
-        background: 'rgba(255,255,255,0.45)',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-      }}>
-        <Icons.Spark size={20} sw={2}/>
-      </div>
+      {!compact && (
+        <div style={{
+          width: 44, height: 44, borderRadius: 12, flexShrink: 0,
+          background: 'rgba(255,255,255,0.45)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}>
+          <Icons.Spark size={20} sw={2}/>
+        </div>
+      )}
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', opacity: 0.75 }}>
+        <div style={{ fontSize: compact ? 10 : 11, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', opacity: 0.75 }}>
           Ivy's insight today
         </div>
-        <div className="page-title" style={{ fontSize: 20, margin: '2px 0 0' }}>{headline.title}</div>
-        <div style={{ fontSize: 12.5, opacity: 0.8, marginTop: 3 }}>{headline.body}</div>
+        <div className="page-title" style={{ fontSize: compact ? 16 : 20, margin: '2px 0 0' }}>{headline.title}</div>
+        <div style={{ fontSize: compact ? 12 : 12.5, opacity: 0.8, marginTop: 3 }}>{headline.body}</div>
+        {compact && (
+          <button onClick={() => onAct(headline.prompt)} style={{
+            marginTop: 8, padding: '7px 12px', borderRadius: 9, border: 0, cursor: 'pointer',
+            background: 'rgba(10,12,8,0.85)', color: 'white', fontSize: 12.5, fontWeight: 600,
+            display: 'inline-flex', alignItems: 'center', gap: 6,
+          }}>
+            Show me how
+            <Icons.Arrow size={11} sw={2.4}/>
+          </button>
+        )}
       </div>
-      <button onClick={() => onAct(headline.prompt)} style={{
-        padding: '8px 14px', borderRadius: 10, border: 0, cursor: 'pointer',
-        background: 'rgba(10,12,8,0.85)', color: 'white', fontSize: 12.5, fontWeight: 600,
-        display: 'inline-flex', alignItems: 'center', gap: 6, flexShrink: 0,
-      }}>
-        Show me how
-        <Icons.Arrow size={11} sw={2.4}/>
-      </button>
+      {!compact && (
+        <button onClick={() => onAct(headline.prompt)} style={{
+          padding: '8px 14px', borderRadius: 10, border: 0, cursor: 'pointer',
+          background: 'rgba(10,12,8,0.85)', color: 'white', fontSize: 12.5, fontWeight: 600,
+          display: 'inline-flex', alignItems: 'center', gap: 6, flexShrink: 0,
+        }}>
+          Show me how
+          <Icons.Arrow size={11} sw={2.4}/>
+        </button>
+      )}
+      {onClose && (
+        <button type="button" onClick={onClose} aria-label="Hide today's insight" style={{
+          position: 'absolute', top: 8, right: 8, width: 30, height: 30, borderRadius: 999,
+          border: 0, cursor: 'pointer', background: 'rgba(10,12,8,0.18)', color: 'inherit',
+          display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+        }}>
+          <Icons.X size={14} sw={2.2}/>
+        </button>
+      )}
     </div>
   );
 }
@@ -398,7 +449,7 @@ function pickInsight(ctx) {
   };
 }
 
-function WelcomePanel({ onPrompt, direction, briefing }) {
+function WelcomePanel({ onPrompt, direction, briefing, compact = false }) {
   const showBriefing = hasBriefing(briefing);
   const prompts = [
     { icon: <Icons.Dollar size={16} sw={1.8}/>,   title: 'Revenue analysis',    body: 'Where is my money coming from this month?',  tone: '#0A8A4B' },
@@ -410,18 +461,22 @@ function WelcomePanel({ onPrompt, direction, briefing }) {
   ];
 
   return (
-    <div style={{ maxWidth: 720, margin: '0 auto', padding: '32px 0' }}>
-      <div style={{ textAlign: 'center', marginBottom: 32 }}>
-        <div style={{ display: 'inline-flex', marginBottom: 16 }}>
-          <SparkBadge direction={direction} size={56}/>
+    <div style={{ maxWidth: 720, margin: '0 auto', padding: compact ? '4px 0 0' : '32px 0' }}>
+      <div style={compact
+        ? { display: 'flex', alignItems: 'center', gap: 12, marginBottom: 14 }
+        : { textAlign: 'center', marginBottom: 32 }}>
+        <div style={{ display: 'inline-flex', marginBottom: compact ? 0 : 16, flexShrink: 0 }}>
+          <SparkBadge direction={direction} size={compact ? 40 : 56}/>
         </div>
-        <h2 className="page-title" style={{ margin: 0, fontSize: 32 }}>
+        <div style={{ minWidth: 0 }}>
+        <h2 className="page-title" style={{ margin: 0, fontSize: compact ? 22 : 32 }}>
           {showBriefing ? greetingLine(briefing.bizName) : 'Welcome to Ivy'}
         </h2>
-        <div style={{ fontSize: 14, color: 'var(--muted)', marginTop: 8, lineHeight: 1.5 }}>
+        <div style={{ fontSize: compact ? 12.5 : 14, color: 'var(--muted)', marginTop: compact ? 2 : 8, lineHeight: 1.4 }}>
           {showBriefing
             ? "Here's where things stand today. Tap an item and I'll take it from there."
             : 'Your AI assistant. Ask anything or start with a prompt below.'}
+        </div>
         </div>
       </div>
 
@@ -460,25 +515,25 @@ function WelcomePanel({ onPrompt, direction, briefing }) {
         </div>
       )}
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: compact ? 8 : 12 }}>
         {prompts.map((p, i) => (
           <button key={i} onClick={() => onPrompt(p.body)} style={{
-            padding: 16, borderRadius: 12, cursor: 'pointer', textAlign: 'left',
+            padding: compact ? '10px 10px' : 16, borderRadius: 12, cursor: 'pointer', textAlign: 'left',
             background: 'var(--surface)', border: '1px solid var(--border)',
-            display: 'flex', alignItems: 'flex-start', gap: 12,
+            display: 'flex', alignItems: 'flex-start', gap: compact ? 8 : 12,
             transition: 'transform .12s, box-shadow .12s, border-color .12s',
           }}
             onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-1px)'; e.currentTarget.style.borderColor = 'var(--border-strong)'; e.currentTarget.style.boxShadow = '0 6px 18px -8px rgba(10,12,8,0.1)'; }}
             onMouseLeave={(e) => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.boxShadow = 'none'; }}>
             <div style={{
-              width: 32, height: 32, borderRadius: 8, flexShrink: 0,
+              width: compact ? 26 : 32, height: compact ? 26 : 32, borderRadius: 8, flexShrink: 0,
               background: `color-mix(in srgb, ${p.tone} 13%, var(--surface-2))`,
               color: p.tone,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
             }}>{p.icon}</div>
-            <div>
-              <div style={{ fontSize: 13.5, fontWeight: 600, marginBottom: 2 }}>{p.title}</div>
-              <div style={{ fontSize: 12, color: 'var(--muted)', lineHeight: 1.4 }}>{p.body}</div>
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontSize: compact ? 12.5 : 13.5, fontWeight: 600, marginBottom: 2 }}>{p.title}</div>
+              <div style={{ fontSize: compact ? 11 : 12, color: 'var(--muted)', lineHeight: 1.35 }}>{p.body}</div>
             </div>
           </button>
         ))}
