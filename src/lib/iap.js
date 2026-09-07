@@ -28,7 +28,7 @@ let purchasesPromise = null;
 async function purchases() {
   if (!isIos()) throw new Error('IAP is iOS-only');
   if (!purchasesPromise) {
-    purchasesPromise = import('@revenuecat/purchases-capacitor').then((m) => m.Purchases);
+    purchasesPromise = import('@revenuecat/purchases-capacitor'); // the MODULE - never resolve with the Purchases proxy (its `.then` lookup becomes a native call)
   }
   return purchasesPromise;
 }
@@ -37,7 +37,7 @@ export async function initIAP() {
   if (initialized || !isIos() || !PUBLIC_KEY) return;
   initialized = true;
   try {
-    const P = await purchases();
+    const { Purchases: P } = await purchases();
     await P.configure({ apiKey: PUBLIC_KEY });
   } catch (err) {
     initialized = false;
@@ -52,7 +52,7 @@ export async function identifyIapUser(workspaceId) {
   if (!isIos() || !workspaceId) return;
   await initIAP();
   try {
-    const P = await purchases();
+    const { Purchases: P } = await purchases();
     await P.logIn({ appUserID: String(workspaceId) });
   } catch (err) {
     // eslint-disable-next-line no-console
@@ -67,7 +67,7 @@ export async function getIapOfferings() {
   if (!isIos()) return [];
   await initIAP();
   try {
-    const P = await purchases();
+    const { Purchases: P } = await purchases();
     const result = await P.getOfferings();
     const cur = result?.current;
     if (!cur?.availablePackages?.length) return [];
@@ -102,7 +102,7 @@ export async function purchaseIapPackage(pkg) {
   if (!isIos()) return { ok: false, error: 'iOS only' };
   if (!pkg?.raw) return { ok: false, error: 'Invalid package' };
   try {
-    const P = await purchases();
+    const { Purchases: P } = await purchases();
     const r = await P.purchasePackage({ aPackage: pkg.raw });
     return {
       ok: true,
@@ -124,7 +124,7 @@ export async function purchaseIapPackage(pkg) {
 export async function restoreIapPurchases() {
   if (!isIos()) return { ok: false, error: 'iOS only' };
   try {
-    const P = await purchases();
+    const { Purchases: P } = await purchases();
     const info = await P.restorePurchases();
     const hasActive = !!info?.entitlements?.active && Object.keys(info.entitlements.active).length > 0;
     return { ok: true, hasActive };
