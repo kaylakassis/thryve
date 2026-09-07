@@ -6,6 +6,7 @@
 // workspace data without exposing the API key to the browser and (b) keep
 // each workspace's conversation isolated.
 import Anthropic from '@anthropic-ai/sdk';
+import { resolveIvyModel, IVY_DEFAULT_MODEL } from './ivyModel.js';
 import { sql } from './db.js';
 import { workspaceTimeZone } from './calendar.js';
 import { IVY_TOOLS, executeIvyTool } from './ivyTools.js';
@@ -28,7 +29,14 @@ function anthropic() {
   return _client;
 }
 
-export const IVY_MODEL = 'claude-opus-4-8';
+// The model is resolved live (see ivyModel.js): the newest Opus the account
+// can see, unless pinned by the IVY_MODEL env var. currentIvyModel() is
+// what the UI shows.
+let currentModel = IVY_DEFAULT_MODEL;
+export async function currentIvyModel() {
+  currentModel = await resolveIvyModel(anthropic());
+  return currentModel;
+}
 const IVY_MAX_TOKENS = 1024;
 const IVY_HISTORY_TURNS = 10;
 // Cap on tool-use loop iterations per user message. Real conversations
@@ -421,6 +429,7 @@ export async function generateReply(text, ctx, history = [], workspaceId = null,
   if (!client) {
     return { text: sanitizeIvyReply(mockReply(text, ctx, attachment)), mode: 'mock', error: 'no-api-key' };
   }
+  const model = await currentIvyModel();
 
   // Platform-wide ceiling first — a runaway/abuse backstop across ALL
   // workspaces. If tripped, no Anthropic call happens for anyone until the
@@ -521,7 +530,7 @@ async function recordUsage(workspaceId, response) {
       cache_read_tokens, cache_creation_tokens, request_count
     )
     VALUES (
-      ${workspaceId}, CURRENT_DATE, ${IVY_MODEL},
+      ${workspaceId}, CURRENT_DATE, ${currentModel},
       ${u.input_tokens || 0}, ${u.output_tokens || 0},
       ${u.cache_read_input_tokens || 0}, ${u.cache_creation_input_tokens || 0}, 1
     )
@@ -811,8 +820,9 @@ async function claudeReply(client, text, ctx, history, attachment, workspaceId) 
     if (remaining < 4000) break; // not enough budget for another round-trip
     // eslint-disable-next-line no-await-in-loop
     response = await client.messages.create({
-      model: IVY_MODEL,
+      model,
       max_tokens: IVY_MAX_TOKENS,
+      output_config: { effort: 'low' },
       system: [
         {
           type: 'text',
@@ -865,8 +875,9 @@ async function claudeReply(client, text, ctx, history, attachment, workspaceId) 
   if (response && response.stop_reason === 'tool_use'
       && (HARD_DEADLINE_MS - (Date.now() - startedAt)) >= 4000) {
     const final = await client.messages.create({
-      model: IVY_MODEL,
+      model,
       max_tokens: IVY_MAX_TOKENS,
+      output_config: { effort: 'low' },
       system: [{ type: 'text', text: IVY_SYSTEM, cache_control: { type: 'ephemeral' } }],
       tools: IVY_TOOLS,
       tool_choice: { type: 'none' },

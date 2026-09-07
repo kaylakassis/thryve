@@ -309,15 +309,16 @@ function UsageMeter({ usage }) {
   const pct = Math.max(reqPct, tokPct);
   const color = pct >= 90 ? 'var(--danger)' : pct >= 70 ? 'var(--warn)' : 'var(--muted)';
   return (
-    <div title={`Today's Ivy usage - resets at midnight UTC.\n${usage.requests}/${usage.requestCap} messages\n${usage.outputTokens.toLocaleString()}/${usage.outputTokenCap.toLocaleString()} reply tokens`}
+    <div title={`Ivy usage today - a fresh ${usage.requestCap} messages every day at midnight UTC.\n${usage.requests}/${usage.requestCap} messages\n${usage.outputTokens.toLocaleString()}/${usage.outputTokenCap.toLocaleString()} reply tokens`}
       style={{ marginTop: 6, fontSize: 10, color: 'var(--muted)' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-        <span>Today</span>
-        <span className="mono-num" style={{ color }}>{usage.requests}/{usage.requestCap} msgs</span>
+        <span>Daily messages</span>
+        <span className="mono-num" style={{ color }}>{usage.requests}/{usage.requestCap} today</span>
       </div>
       <div style={{ height: 3, background: 'var(--surface-2)', borderRadius: 99, overflow: 'hidden' }}>
         <div style={{ width: `${pct}%`, height: '100%', background: color, transition: 'width .3s' }}/>
       </div>
+      <div style={{ marginTop: 4, color: 'var(--muted-2)' }}>Resets every day at midnight UTC</div>
     </div>
   );
 }
