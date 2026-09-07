@@ -328,7 +328,12 @@ function ChecklistRow({ item }) {
 function HeroBand() {
   const hour = new Date().getHours();
   const nav = useNavigate();
-  const greet = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
+  const { user } = useAuth();
+  // First name from the name the owner typed at signup (or in Account).
+  // Falls back to the plain greeting when there is no name on file.
+  const first = (user?.name || '').trim().split(/\s+/)[0] || '';
+  const timeOfDay = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
+  const greet = first ? `${timeOfDay}, ${first}` : timeOfDay;
   const dateStr = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' }).toUpperCase();
   return (
     <div className="hero-band" style={{
