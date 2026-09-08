@@ -23,6 +23,7 @@ import {
 } from '../_lib/stripe.js';
 import { computeTotals } from '../_lib/finance.js';
 import { applySubscriptionState } from '../_lib/memberships.js';
+import { applyProgramSubscription, grantEnrollment } from '../_lib/programs.js';
 import { notifyOwnerSafe } from '../_lib/push.js';
 import { notifyInvoicePaid } from '../_lib/invoiceNotify.js';
 import { markInvoicePaid } from '../_lib/invoicePayments.js';
@@ -132,6 +133,12 @@ export default async function handler(req, res) {
       // doesn't resolve to a known client + tier in this workspace.
       // stripeContext lets it fetch unknown customers and auto-provision
       // a clients row when the Dashboard-originated path can't match.
+      // Programs sold on a subscription carry metadata.purpose='program';
+      // their access lives in program_enrollments, not memberships.
+      if (sub.metadata?.purpose === 'program') {
+        const result = await applyProgramSubscription({ workspaceId, sub });
+        return ok(res, { received: true, applied: 'program-subscription', result });
+      }
       const platformKey = platformStripeSecret();
       const result = await applySubscriptionState({
         workspaceId, sub,
@@ -235,6 +242,21 @@ export default async function handler(req, res) {
       // Provisions a client_packages row with credits_remaining =
       // session_count. Idempotent on (session_id) so a duplicate event
       // can't double-provision credits.
+      // One-time program purchase → grant access. Idempotent on the
+      // session id (unique index), so a redelivered event is a no-op.
+      if (session.mode === 'payment' && session.metadata?.purpose === 'program') {
+        const programId = session.metadata?.program_id;
+        const clientId = session.metadata?.client_id;
+        if (!programId || !clientId) return ok(res, { received: true, ignored: 'program metadata incomplete' });
+        const prog = (await sql`SELECT id, billing, price_cents FROM programs WHERE id = ${programId} AND workspace_id = ${workspaceId}`).rows[0];
+        const cli = (await sql`SELECT id FROM clients WHERE id = ${clientId} AND workspace_id = ${workspaceId}`).rows[0];
+        if (!prog || !cli) return ok(res, { received: true, ignored: 'program or client not found' });
+        const already = (await sql`SELECT id FROM program_enrollments WHERE stripe_session_id = ${sessionId}`).rows[0];
+        if (already) return ok(res, { received: true, applied: 'program-purchase', duplicate: true });
+        await grantEnrollment({ programId, workspaceId, clientId, source: 'purchase', billing: 'one_time', priceCents: prog.price_cents, stripeSessionId: sessionId });
+        return ok(res, { received: true, applied: 'program-purchase' });
+      }
+
       if (session.metadata?.purpose === 'package') {
         const packageId = session.metadata?.package_id;
         const clientId  = session.metadata?.client_id;

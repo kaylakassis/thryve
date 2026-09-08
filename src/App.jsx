@@ -29,6 +29,9 @@ const Dashboard   = lazy(() => import('./features/dashboard/Dashboard.jsx'));
 const Clients     = lazy(() => import('./features/clients/Clients.jsx'));
 const Projects    = lazy(() => import('./features/projects/Projects.jsx'));
 const ProgramsPage = lazy(() => import('./features/programs/ProgramsPage.jsx'));
+const PublicProgram = lazy(() => import('./features/programs/PublicProgram.jsx'));
+const ClientPrograms = lazy(() => import('./features/client/ClientPrograms.jsx'));
+const ClientProgram = lazy(() => import('./features/client/ClientPrograms.jsx').then((m) => ({ default: m.ClientProgram })));
 const Calendar    = lazy(() => import('./features/calendar/Calendar.jsx'));
 const Finance     = lazy(() => import('./features/finance/Finance.jsx'));
 const Goals       = lazy(() => import('./features/goals/Goals.jsx'));
@@ -245,6 +248,7 @@ export default function App() {
         <Route path="/invoice/:token"  element={<PublicInvoice />} />
         <Route path="/quote/:token"    element={<PublicQuote />} />
         <Route path="/review/:token"   element={<ReviewPage />} />
+        <Route path="/p/:id" element={<PublicProgram />} />
 
         {/* Embeds - same components rendered inside iframes on the
             owner's external website. embed.js (served from /public)
@@ -319,6 +323,8 @@ export default function App() {
           <Route path="/me/discover"  element={<ClientDiscover />} />
           <Route path="/me/notifications" element={<ClientNotifications />} />
           <Route path="/me/profile"       element={<ClientProfile />} />
+          <Route path="/me/programs" element={<ClientPrograms />} />
+          <Route path="/me/programs/:id" element={<ClientProgram />} />
         </Route>
 
         {/* 404 catch-all. Must be last so it only matches when nothing

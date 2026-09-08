@@ -26,6 +26,11 @@ export function unauthorized(res, message = 'Unauthorized') {
   console.warn('[api] 401:', message, '·', res.req?.method, res.req?.url);
   return res.status(401).json({ error: message });
 }
+export function forbidden(res, message = 'Forbidden') {
+  // eslint-disable-next-line no-console
+  console.warn('[api] 403:', message, '·', res.req?.method, res.req?.url);
+  return res.status(403).json({ error: message });
+}
 export function notFound(res, message = 'Not found') {
   // eslint-disable-next-line no-console
   console.warn('[api] 404:', message, '·', res.req?.method, res.req?.url);

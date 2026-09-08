@@ -3092,4 +3092,78 @@ CREATE TABLE IF NOT EXISTS comp_invites (
   claimed_workspace_id UUID REFERENCES workspaces(id) ON DELETE SET NULL
 );
 CREATE UNIQUE INDEX IF NOT EXISTS uq_comp_invites_email ON comp_invites (LOWER(email));
+
+-- ── Programs: sellable courses / coaching programs / paid communities ──
+-- Content is soft-deleted (deleted_at) and enrollments live in their own
+-- table, so editing or removing content never touches a member's access
+-- or subscription. Deleting a program archives it (no new sales; existing
+-- members keep access until their subscription ends or is revoked).
+CREATE TABLE IF NOT EXISTS programs (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  workspace_id UUID NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+  title TEXT NOT NULL,
+  description TEXT,
+  cover_url TEXT,
+  price_cents INT NOT NULL DEFAULT 0 CHECK (price_cents >= 0),
+  billing TEXT NOT NULL DEFAULT 'one_time' CHECK (billing IN ('one_time', 'month', 'year')),
+  community_enabled BOOLEAN NOT NULL DEFAULT TRUE,
+  status TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft', 'published', 'archived')),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_programs_workspace ON programs(workspace_id, status);
+
+CREATE TABLE IF NOT EXISTS program_items (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  program_id UUID NOT NULL REFERENCES programs(id) ON DELETE CASCADE,
+  workspace_id UUID NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+  type TEXT NOT NULL CHECK (type IN ('pdf', 'post', 'video')),
+  title TEXT NOT NULL,
+  body TEXT,
+  file_url TEXT,
+  file_name TEXT,
+  youtube_id TEXT,
+  position INT NOT NULL DEFAULT 0,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  deleted_at TIMESTAMPTZ
+);
+CREATE INDEX IF NOT EXISTS idx_program_items_program ON program_items(program_id, position);
+
+CREATE TABLE IF NOT EXISTS program_enrollments (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  program_id UUID NOT NULL REFERENCES programs(id) ON DELETE CASCADE,
+  workspace_id UUID NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+  client_id UUID NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
+  source TEXT NOT NULL DEFAULT 'manual' CHECK (source IN ('manual', 'purchase', 'subscription')),
+  status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'past_due', 'cancelled')),
+  price_cents INT NOT NULL DEFAULT 0,
+  billing TEXT NOT NULL DEFAULT 'one_time',
+  stripe_subscription_id TEXT,
+  stripe_session_id TEXT,
+  current_period_end TIMESTAMPTZ,
+  granted_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  cancelled_at TIMESTAMPTZ,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_program_enrollments_sub ON program_enrollments(stripe_subscription_id) WHERE stripe_subscription_id IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS uq_program_enrollments_session ON program_enrollments(stripe_session_id) WHERE stripe_session_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_program_enrollments_client ON program_enrollments(client_id, status);
+CREATE INDEX IF NOT EXISTS idx_program_enrollments_program ON program_enrollments(program_id, status);
+
+CREATE TABLE IF NOT EXISTS program_posts (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  program_id UUID NOT NULL REFERENCES programs(id) ON DELETE CASCADE,
+  workspace_id UUID NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+  parent_id UUID REFERENCES program_posts(id) ON DELETE CASCADE,
+  author_user_id UUID REFERENCES users(id) ON DELETE SET NULL,
+  author_client_id UUID REFERENCES clients(id) ON DELETE SET NULL,
+  author_name TEXT NOT NULL,
+  is_owner BOOLEAN NOT NULL DEFAULT FALSE,
+  kind TEXT NOT NULL DEFAULT 'post' CHECK (kind IN ('post', 'win', 'question')),
+  body TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  deleted_at TIMESTAMPTZ
+);
+CREATE INDEX IF NOT EXISTS idx_program_posts_program ON program_posts(program_id, created_at DESC);
 `;

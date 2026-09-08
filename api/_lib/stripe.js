@@ -94,7 +94,7 @@ function formEncode(params, prefix = '') {
   return out.filter(Boolean).join('&');
 }
 
-async function stripeFetch(path, { method = 'GET', secretKey, stripeAccount, body, idempotencyKey }) {
+export async function stripeFetch(path, { method = 'GET', secretKey, stripeAccount, body, idempotencyKey }) {
   if (!secretKey || typeof secretKey !== 'string') {
     throw new Error('Stripe secret key is required');
   }

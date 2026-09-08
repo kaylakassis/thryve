@@ -24,6 +24,7 @@ const NAV = [
   { to: '/me/orders',    label: 'Orders',    icon: 'Gift',     section: 'Activity' },
   { to: '/me/invoices',  label: 'Payments',  icon: 'Dollar',   section: 'Money' },
   { to: '/me/billing',   label: 'Billing',   icon: 'Lock',     section: 'Money' },
+  { to: '/me/programs',  label: 'Programs',  icon: 'Gift',     section: 'Tools' },
   { to: '/me/documents', label: 'Documents', icon: 'Doc',      section: 'Tools' },
   { to: '/me/discover',  label: 'Discover',  icon: 'Globe',    section: 'Tools' },
 ];
