@@ -1,7 +1,7 @@
 // Ivy - full-page AI assistant.
 // Three-column layout: left (history + new chat), center (chat / welcome),
 // right (workspace context + upload placeholder).
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Icons } from '../../components/Icons.jsx';
 import EmptyNote from '../../components/EmptyNote.jsx';
@@ -26,6 +26,38 @@ export default function IvyPro() {
   const [draft, setDraft] = useState('');
   // Mobile: 'chat' | 'history' | 'data' tab. Default to chat.
   const [mobileTab, setMobileTab] = useState('chat');
+  // Fill exactly the space below the header and above the tab bar -
+  // measured, not guessed. Fixed numbers left a scrollable strip of blank
+  // page whenever the header was taller than assumed (the verify-email
+  // banner) or the wrappers reserved more than the tab bar uses. Two-pass:
+  // read how much page sits below this panel (wrapper paddings, insets),
+  // then size the panel so the page ends exactly at the viewport.
+  // Callback ref: the panel mounts after a loading branch, so a plain ref
+  // would be null on the first effect run and never re-checked.
+  const [rootEl, setRootEl] = useState(null);
+  const [fillHeight, setFillHeight] = useState(null);
+  useLayoutEffect(() => {
+    const el = rootEl;
+    if (!el) return undefined;
+    let raf = 0;
+    const measure = () => {
+      raf = 0;
+      const rect = el.getBoundingClientRect();
+      const top = rect.top + window.scrollY;
+      const below = Math.max(0, document.documentElement.scrollHeight - (rect.bottom + window.scrollY));
+      const vh = window.visualViewport?.height || window.innerHeight;
+      const next = Math.max(320, Math.round(vh - top - below));
+      setFillHeight((prev) => (prev && Math.abs(prev - next) < 2 ? prev : next));
+    };
+    const schedule = () => { if (!raf) raf = requestAnimationFrame(measure); };
+    schedule();
+    window.addEventListener('resize', schedule);
+    window.visualViewport?.addEventListener('resize', schedule);
+    const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(schedule) : null;
+    ro?.observe(document.body);
+    return () => { cancelAnimationFrame(raf); window.removeEventListener('resize', schedule); window.visualViewport?.removeEventListener('resize', schedule); ro?.disconnect(); };
+  }, [rootEl]);
+
   // Today's insight can be closed; it stays closed for the rest of the day.
   const todayKey = new Date().toISOString().slice(0, 10);
   const [insightHidden, setInsightHidden] = useState(() => {
@@ -88,13 +120,8 @@ export default function IvyPro() {
   const showData    = (!isMobile && !isTablet) || (isMobile && mobileTab === 'data');
 
   return (
-    <div style={{
-      // Mobile: the visible height is the viewport minus the status bar, the
-      // 56px header, and the tab bar with the home-indicator inset - so the
-      // composer sits at the bottom of the screen without scrolling.
-      height: isMobile
-        ? 'calc(100dvh - env(safe-area-inset-top, 0px) - 56px - 72px - env(safe-area-inset-bottom, 0px))'
-        : 'calc(100vh - 60px)',
+    <div ref={setRootEl} style={{
+      height: fillHeight ? `${fillHeight}px` : (isMobile ? 'calc(100dvh - 128px)' : 'calc(100vh - 60px)'),
       display: 'grid',
       gridTemplateColumns: cols,
       gridTemplateRows: isMobile ? 'auto minmax(0, 1fr)' : 'minmax(0, 1fr)',

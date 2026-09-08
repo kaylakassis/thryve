@@ -27,7 +27,7 @@ export default function ClientPrograms() {
                 <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '.06em', textTransform: 'uppercase', color: 'var(--accent)' }}>{p.businessName}</div>
                 <div style={{ fontSize: 16, fontWeight: 600 }}>{p.title}</div>
                 <div style={{ fontSize: 13, color: 'var(--muted)', lineHeight: 1.45, display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{p.description}</div>
-                <div style={{ marginTop: 'auto', fontSize: 12.5, color: 'var(--fg-2)' }}>{p.items} item{p.items === 1 ? '' : 's'}{p.enrollmentStatus === 'past_due' ? ' · payment past due' : ''}</div>
+                <div style={{ marginTop: 'auto', fontSize: 12.5, color: 'var(--fg-2)' }}>{p.items} item{p.items === 1 ? '' : 's'}{p.enrollmentStatus === 'past_due' ? ' · payment past due' : ''}{p.expiresAt ? ` · access until ${new Date(p.expiresAt).toLocaleDateString()}` : p.currentPeriodEnd ? ` · renews ${new Date(p.currentPeriodEnd).toLocaleDateString()}` : ''}</div>
               </Link>
             ))}
           </div>
@@ -39,7 +39,13 @@ export default function ClientPrograms() {
 export function ClientProgram() {
   const { id } = useParams();
   const [data, setData] = useState(null); const [err, setErr] = useState(null); const [tab, setTab] = useState('content');
-  useEffect(() => { api.get(`/me/programs/${id}`).then(setData).catch((e) => setErr(e.message)); }, [id]);
+  const [mine, setMine] = useState(null); const [cancelMsg, setCancelMsg] = useState(null);
+  useEffect(() => { api.get(`/me/programs/${id}`).then(setData).catch((e) => setErr(e.message)); api.get('/me/programs').then((r) => setMine((r.programs || []).find((p) => p.id === id) || null)).catch(() => {}); }, [id]);
+  const cancel = async () => {
+    if (!window.confirm('Cancel this subscription? You keep access until the end of the period you already paid for.')) return;
+    try { const r = await api.del(`/me/programs/${id}/subscription`); setCancelMsg(`Cancelled. Access continues until ${r.accessUntil ? new Date(r.accessUntil).toLocaleDateString() : 'the end of the current period'}.`); }
+    catch (e) { setCancelMsg(e.message); }
+  };
   if (err) return <div className="page-pad"><EmptyNote icon="Lock" title="No access" hint={err} action={<Link className="btn btn-outline" to="/me/programs">Back to programs</Link>}/></div>;
   if (!data) return <div className="page-pad" style={{ color: 'var(--muted)', fontSize: 13 }}>Loading…</div>;
   const { program, items } = data;
@@ -50,6 +56,13 @@ export function ClientProgram() {
         <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '.06em', textTransform: 'uppercase', color: 'var(--accent)' }}>{program.businessName}</div>
         <h2 className="page-title" style={{ margin: '4px 0 0', fontSize: 26 }}>{program.title}</h2>
         {program.description && <div style={{ fontSize: 13.5, color: 'var(--fg-2)', marginTop: 6, lineHeight: 1.5 }}>{program.description}</div>}
+        {mine && (
+          <div style={{ marginTop: 8, fontSize: 12.5, color: 'var(--muted)', display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+            <span>{mine.expiresAt ? `Access until ${new Date(mine.expiresAt).toLocaleDateString()}` : mine.currentPeriodEnd ? `Renews ${new Date(mine.currentPeriodEnd).toLocaleDateString()}` : 'Lifetime access'}{mine.enrollmentStatus === 'past_due' ? ' · payment past due' : ''}</span>
+            {mine.canCancel && !cancelMsg && <button type="button" onClick={cancel} style={{ color: 'var(--accent)', fontSize: 12.5 }}>Cancel subscription</button>}
+            {cancelMsg && <span style={{ color: 'var(--fg-2)' }}>{cancelMsg}</span>}
+          </div>
+        )}
       </div>
       {program.communityEnabled && (
         <div style={{ display: 'flex', gap: 4, padding: 4, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, alignSelf: 'flex-start' }}>

@@ -72,7 +72,7 @@ jobs:
     # Measured: this project's remote Vercel build (migrate + vite +
     # ~150 serverless functions) runs 12-15 min. 30 gives headroom while
     # still killing a genuine hang long before GitHub's 6-hour default.
-    timeout-minutes: 30
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
 

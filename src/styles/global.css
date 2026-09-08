@@ -818,6 +818,11 @@ html.native .mobile-nav.native .mobile-nav-item {
 html.native .mobile-nav.native .mobile-nav-item.active { color: var(--accent); background: none; }
 html.native .mobile-nav.native .mobile-nav-item:active { transform: none; opacity: .7; }
 html.native body.has-mobile-nav .app-root > div { padding-bottom: calc(72px + env(safe-area-inset-bottom, 0px)); }
+/* The shell's <main> insists on min-height 100vh; with the tab-bar padding
+   above that made every short page 72px taller than the screen - a strip of
+   blank page you could scroll into. The outer wrapper already guarantees a
+   full-height page (border-box, padding included), so main can relax. */
+html.native body.has-mobile-nav .app-root > div > main { min-height: 0 !important; }
 
 /* Touch feedback replaces hover. */
 html.native .btn:active { opacity: .72; transform: scale(.985); }

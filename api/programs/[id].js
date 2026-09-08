@@ -36,7 +36,7 @@ export default async function handler(req, res) {
       const f = { ...p, ...v.value };
       const { rows } = await sql`
         UPDATE programs SET title = ${f.title}, description = ${f.description}, cover_url = ${f.cover_url}, price_cents = ${f.price_cents},
-          billing = ${f.billing}, community_enabled = ${f.community_enabled}, status = ${f.status}, updated_at = NOW()
+          billing = ${f.billing}, community_enabled = ${f.community_enabled}, access_days = ${f.access_days}, status = ${f.status}, updated_at = NOW()
         WHERE id = ${id} AND workspace_id = ${workspaceId} RETURNING *`;
       return ok(res, { program: serializeProgram(rows[0]) });
     }

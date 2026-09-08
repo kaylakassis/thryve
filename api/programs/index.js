@@ -27,8 +27,8 @@ export default async function handler(req, res) {
       const v = cleanProgramInput(body);
       if (!v.ok) return badRequest(res, v.errors[0]);
       const { rows } = await sql`
-        INSERT INTO programs (workspace_id, title, description, cover_url, price_cents, billing, community_enabled)
-        VALUES (${workspaceId}, ${v.value.title}, ${v.value.description}, ${v.value.cover_url}, ${v.value.price_cents}, ${v.value.billing}, ${v.value.community_enabled})
+        INSERT INTO programs (workspace_id, title, description, cover_url, price_cents, billing, community_enabled, access_days)
+        VALUES (${workspaceId}, ${v.value.title}, ${v.value.description}, ${v.value.cover_url}, ${v.value.price_cents}, ${v.value.billing}, ${v.value.community_enabled}, ${v.value.access_days})
         RETURNING *`;
       return created(res, { program: serializeProgram(rows[0], { members: 0, items: 0 }) });
     }

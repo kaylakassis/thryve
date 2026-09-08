@@ -22,10 +22,10 @@ export const NAV = [
   { id: 'calendar',  to: '/calendar',   label: 'Calendar',       icon: 'Calendar', section: 'Run', productOnlyHidden: true },
   { id: 'comms',     to: '/messages',   label: 'Messages',       icon: 'Chat',     section: 'Run' },
   { id: 'projects',  to: '/projects',   label: 'Projects',       icon: 'Doc',      section: 'Run' },
-  { id: 'programs',  to: '/programs',   label: 'Programs',       icon: 'Gift',     section: 'Run', accent: true },
   // Money.
   { id: 'finance',   to: '/finance',    label: 'Finance',        icon: 'Dollar',   section: 'Money' },
   // Grow.
+  { id: 'programs',  to: '/programs',   label: 'Programs',       icon: 'Gift',     section: 'Grow', accent: true },
   { id: 'campaigns', to: '/campaigns',  label: 'Campaigns',      icon: 'Mail',     section: 'Grow' },
   { id: 'reviews',   to: '/reviews',    label: 'Reviews',        icon: 'Heart',    section: 'Grow' },
   { id: 'rewards',   to: '/rewards',    label: 'Rewards',        icon: 'Gift',     section: 'Grow' },

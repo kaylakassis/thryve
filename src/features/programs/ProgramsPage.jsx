@@ -126,11 +126,11 @@ function Sheet({ title, onClose, children, width = 520 }) {
 }
 
 function ProgramForm({ program, onClose, onSaved }) {
-  const [f, setF] = useState({ title: program?.title || '', description: program?.description || '', price: program ? (program.priceCents / 100).toString() : '', billing: program?.billing || 'one_time', communityEnabled: program ? program.communityEnabled : true });
+  const [f, setF] = useState({ title: program?.title || '', description: program?.description || '', price: program ? (program.priceCents / 100).toString() : '', billing: program?.billing || 'one_time', accessDays: program?.accessDays ? String(program.accessDays) : '', communityEnabled: program ? program.communityEnabled : true });
   const [busy, setBusy] = useState(false); const [err, setErr] = useState(null);
   const submit = async (e) => {
     e.preventDefault(); setBusy(true); setErr(null);
-    const payload = { title: f.title, description: f.description, priceCents: Math.round(Number(f.price || 0) * 100), billing: f.billing, communityEnabled: f.communityEnabled };
+    const payload = { title: f.title, description: f.description, priceCents: Math.round(Number(f.price || 0) * 100), billing: f.billing, accessDays: f.billing === 'one_time' && f.accessDays ? Number(f.accessDays) : null, communityEnabled: f.communityEnabled };
     try { const r = program ? await api.patch(`/programs/${program.id}`, payload) : await api.post('/programs', payload); onSaved(r.program); }
     catch (ex) { setErr(ex.message); } finally { setBusy(false); }
   };
@@ -143,6 +143,13 @@ function ProgramForm({ program, onClose, onSaved }) {
           <Field label="Price" hint="0 = free (add members by hand)"><input className="input" type="number" min="0" step="0.01" inputMode="decimal" value={f.price} onChange={(e) => setF({ ...f, price: e.target.value })} placeholder="0.00"/></Field>
           <Field label="Billing"><select className="input" value={f.billing} onChange={(e) => setF({ ...f, billing: e.target.value })}><option value="one_time">One-time</option><option value="month">Monthly subscription</option><option value="year">Yearly subscription</option></select></Field>
         </div>
+        {f.billing === 'one_time' ? (
+          <Field label="Access lasts" hint="Leave blank for lifetime access. Otherwise access ends this many days after purchase (e.g. 56 for an 8-week program).">
+            <input className="input" type="number" min="1" max="3650" inputMode="numeric" value={f.accessDays} onChange={(e) => setF({ ...f, accessDays: e.target.value })} placeholder="Forever"/>
+          </Field>
+        ) : (
+          <div style={{ fontSize: 12.5, color: 'var(--muted)', lineHeight: 1.5 }}>Members keep access while their subscription is active and lose it automatically when it ends or a payment fails.</div>
+        )}
         <label style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 14 }}><input type="checkbox" checked={f.communityEnabled} onChange={(e) => setF({ ...f, communityEnabled: e.target.checked })}/> Enable the members-only community</label>
         {err && <div style={{ fontSize: 12.5, color: 'var(--danger)' }}>{err}</div>}
         <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}><button type="button" className="btn btn-ghost" onClick={onClose}>Cancel</button><button type="submit" className="btn btn-primary" disabled={busy || !f.title.trim()}>{busy ? 'Saving…' : program ? 'Save' : 'Create'}</button></div>
@@ -223,7 +230,7 @@ function ProgramDetail({ id, onBack }) {
             <div style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: '.06em', textTransform: 'uppercase', color: program.status === 'published' ? 'var(--ok)' : 'var(--muted)' }}>{program.status}</div>
             <h2 className="page-title" style={{ margin: '4px 0 0', fontSize: 26 }}>{program.title}</h2>
             <div style={{ fontSize: 13.5, color: 'var(--fg-2)', marginTop: 6, lineHeight: 1.5 }}>{program.description || 'No description yet.'}</div>
-            <div style={{ fontSize: 13, color: 'var(--muted)', marginTop: 8 }}><b style={{ color: 'var(--fg)' }}>{program.priceCents ? fmtPrice(program.priceCents) : 'Free'}</b> {program.priceCents ? billingLabel(program.billing) : ''} · {activeMembers.length} member{activeMembers.length === 1 ? '' : 's'} · community {program.communityEnabled ? 'on' : 'off'}</div>
+            <div style={{ fontSize: 13, color: 'var(--muted)', marginTop: 8 }}><b style={{ color: 'var(--fg)' }}>{program.priceCents ? fmtPrice(program.priceCents) : 'Free'}</b> {program.priceCents ? billingLabel(program.billing) : ''}{program.billing === 'one_time' ? ` · access ${program.accessDays ? `${program.accessDays} days` : 'forever'}` : ''} · {activeMembers.length} member{activeMembers.length === 1 ? '' : 's'} · community {program.communityEnabled ? 'on' : 'off'}</div>
           </div>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             <button className="btn btn-outline" onClick={() => setEditing(true)}>Edit</button>
@@ -265,7 +272,7 @@ function ProgramDetail({ id, onBack }) {
                 <div key={m.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', borderBottom: '1px solid var(--border)', opacity: m.status === 'cancelled' ? .55 : 1 }}>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: 14, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.clientName || m.clientEmail}</div>
-                    <div style={{ fontSize: 12, color: 'var(--muted)' }}>{m.clientEmail} · {m.source === 'manual' ? 'added by you' : m.source === 'subscription' ? `subscription${m.currentPeriodEnd ? ` · renews ${new Date(m.currentPeriodEnd).toLocaleDateString()}` : ''}` : 'purchased'} · {m.status}</div>
+                    <div style={{ fontSize: 12, color: 'var(--muted)' }}>{m.clientEmail} · {m.source === 'manual' ? 'added by you' : m.source === 'subscription' ? `subscription${m.currentPeriodEnd ? ` · renews ${new Date(m.currentPeriodEnd).toLocaleDateString()}` : ''}` : 'purchased'}{m.expiresAt ? ` · ends ${new Date(m.expiresAt).toLocaleDateString()}` : ''} · {m.status}</div>
                   </div>
                   {m.status !== 'cancelled' && <button type="button" onClick={() => revoke(m)} className="btn btn-ghost" style={{ fontSize: 12.5, padding: '6px 10px', minHeight: 32 }}>Remove access</button>}
                 </div>

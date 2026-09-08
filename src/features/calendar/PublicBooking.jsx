@@ -97,6 +97,7 @@ export default function PublicBooking({ embedded = false }) {
   // Membership subscribe modal - separate from the booking flow.
   const [joiningMembership, setJoiningMembership] = useState(null);
   const [buyingPackage, setBuyingPackage] = useState(null);
+  const [buyingProgram, setBuyingProgram] = useState(null);
   // Gift card buy modal.
   const [giftCardOpen, setGiftCardOpen] = useState(false);
   // Gift card application at checkout.
@@ -413,6 +414,12 @@ export default function PublicBooking({ embedded = false }) {
         />
       )}
 
+      {/* Programs - courses, plans and paid communities. Checkout is
+          /api/programs/checkout; access is granted by the Stripe webhook. */}
+      {step === 'pick' && cal.programs?.length > 0 && !embedded && (
+        <ProgramsBlock programs={cal.programs} bizName={cal.settings.bizName} onBuy={(p) => setBuyingProgram(p)}/>
+      )}
+
       {/* Gift card CTA - same step as the slot picker so it doesn't
           get in the way of someone who's actively trying to book. */}
       {step === 'pick' && (
@@ -441,6 +448,9 @@ export default function PublicBooking({ embedded = false }) {
         />
       )}
 
+      {buyingProgram && (
+        <ProgramBuyModal program={buyingProgram} bizName={cal.settings.bizName} onClose={() => setBuyingProgram(null)}/>
+      )}
       {buyingPackage && (
         <BuyPackageModal
           slug={slug}
@@ -1796,6 +1806,71 @@ function ContactModal({ slug, bizName, onClose }) {
           </form>
         )}
       </div>
+    </div>
+  );
+}
+
+
+// ── Programs (courses, plans, communities) sold from the booking page ──
+const fmtProgramPrice = (cents) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: cents % 100 ? 2 : 0 }).format((cents || 0) / 100);
+const programBilling = (b) => b === 'month' ? '/ month' : b === 'year' ? '/ year' : 'one-time';
+
+function ProgramsBlock({ programs, bizName, onBuy }) {
+  return (
+    <div style={{ marginTop: 18 }}>
+      <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: '.06em', textTransform: 'uppercase', color: 'var(--muted)', marginBottom: 8 }}>Programs from {bizName}</div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 10 }}>
+        {programs.map((p) => (
+          <div key={p.id} className="card" style={{ padding: 14, display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <div style={{ fontSize: 15, fontWeight: 600 }}>{p.title}</div>
+            {p.description && <div style={{ fontSize: 13, color: 'var(--muted)', lineHeight: 1.45, display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{p.description}</div>}
+            <div style={{ fontSize: 12.5, color: 'var(--fg-2)' }}>{p.items} item{p.items === 1 ? '' : 's'}{p.communityEnabled ? ' · private community' : ''}{p.billing === 'one_time' && p.accessDays ? ` · ${p.accessDays} days of access` : ''}</div>
+            <div style={{ marginTop: 'auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+              <span><b style={{ fontSize: 16 }}>{p.priceCents ? fmtProgramPrice(p.priceCents) : 'Free'}</b> {p.priceCents ? <span style={{ fontSize: 12, color: 'var(--muted)' }}>{programBilling(p.billing)}</span> : null}</span>
+              <div style={{ display: 'flex', gap: 6 }}>
+                <a href={`/p/${p.id}`} className="btn btn-ghost" style={{ fontSize: 12.5, padding: '6px 10px' }}>Details</a>
+                {p.priceCents > 0 && <button className="btn btn-primary" style={{ fontSize: 12.5, padding: '6px 12px' }} onClick={() => onBuy(p)}>{p.billing === 'one_time' ? 'Buy' : 'Subscribe'}</button>}
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function ProgramBuyModal({ program, bizName, onClose }) {
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState(null);
+  const submit = async (e) => {
+    e.preventDefault();
+    if (!name.trim() || !email.trim()) { setErr('Both fields are required'); return; }
+    setBusy(true); setErr(null);
+    try {
+      const res = await fetch('/api/programs/checkout', {
+        method: 'POST', credentials: 'omit', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ programId: program.id, name: name.trim(), email: email.trim() }),
+      });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(j.error || `HTTP ${res.status}`);
+      window.location.href = j.url;
+    } catch (ex) { setErr(ex.message); setBusy(false); }
+  };
+  return (
+    <div role="dialog" aria-modal="true" onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 120, background: 'rgba(0,0,0,.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+      <form onClick={(e) => e.stopPropagation()} onSubmit={submit} className="card" style={{ width: '100%', maxWidth: 420, padding: 20, display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <div style={{ fontSize: 17, fontWeight: 600 }}>{program.title}</div>
+        <div style={{ fontSize: 13, color: 'var(--muted)' }}>{fmtProgramPrice(program.priceCents)} {programBilling(program.billing)} · paid to {bizName} through Stripe</div>
+        <input className="input" placeholder="Your name" value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" autoFocus/>
+        <input className="input" type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email"/>
+        {err && <div style={{ fontSize: 12.5, color: 'var(--danger)' }}>{err}</div>}
+        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+          <button type="button" className="btn btn-ghost" onClick={onClose}>Cancel</button>
+          <button type="submit" className="btn btn-primary" disabled={busy}>{busy ? 'Opening checkout…' : program.billing === 'one_time' ? 'Continue to payment' : 'Subscribe'}</button>
+        </div>
+      </form>
     </div>
   );
 }

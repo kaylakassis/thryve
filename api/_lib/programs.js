@@ -9,7 +9,7 @@ export const POST_KINDS = new Set(['post', 'win', 'question']);
 export function serializeProgram(r, extra = {}) {
   return {
     id: r.id, title: r.title, description: r.description || '', coverUrl: r.cover_url || null,
-    priceCents: Number(r.price_cents) || 0, billing: r.billing, communityEnabled: !!r.community_enabled,
+    priceCents: Number(r.price_cents) || 0, billing: r.billing, accessDays: r.access_days == null ? null : Number(r.access_days), communityEnabled: !!r.community_enabled,
     status: r.status, createdAt: r.created_at, updatedAt: r.updated_at, ...extra,
   };
 }
@@ -24,8 +24,8 @@ export function serializeEnrollment(r) {
   return {
     id: r.id, programId: r.program_id, clientId: r.client_id, clientName: r.client_name || null,
     clientEmail: r.client_email || null, source: r.source, status: r.status, billing: r.billing,
-    priceCents: Number(r.price_cents) || 0, currentPeriodEnd: r.current_period_end, grantedAt: r.granted_at,
-    cancelledAt: r.cancelled_at,
+    priceCents: Number(r.price_cents) || 0, currentPeriodEnd: r.current_period_end, expiresAt: r.expires_at || null, grantedAt: r.granted_at,
+    cancelledAt: r.cancelled_at, stripeSubscriptionId: r.stripe_subscription_id || null,
   };
 }
 export function serializePost(r) {
@@ -72,6 +72,11 @@ export function cleanProgramInput(body, partial = false) {
     out.billing = b;
   }
   if (!partial || body.communityEnabled !== undefined) out.community_enabled = body.communityEnabled !== false;
+  if (!partial || body.accessDays !== undefined) {
+    const d = body.accessDays == null || body.accessDays === '' ? null : Math.round(Number(body.accessDays));
+    if (d != null && (!Number.isFinite(d) || d < 1 || d > 3650)) errors.push('Access length must be between 1 and 3650 days, or blank for forever.');
+    out.access_days = d;
+  }
   if (partial && body.status !== undefined) {
     const st = String(body.status);
     if (!['draft', 'published'].includes(st)) errors.push('Status must be draft or published.');
@@ -91,7 +96,7 @@ export async function programAccess(user, programId, ownerWorkspaceId = null) {
   if (myIds.length) {
     const e = (await sql.query(
       `SELECT client_id FROM program_enrollments
-        WHERE program_id = $1 AND client_id = ANY($2) AND status IN ('active','past_due') LIMIT 1`,
+        WHERE program_id = $1 AND client_id = ANY($2) AND status IN ('active','past_due') AND (expires_at IS NULL OR expires_at > NOW()) LIMIT 1`,
       [programId, myIds],
     )).rows[0];
     if (e) return { role: 'member', program: p, clientId: e.client_id };
@@ -105,7 +110,7 @@ export async function activeMemberCount(programId) {
 }
 
 // Grants or refreshes access for a client. Idempotent on the Stripe ids.
-export async function grantEnrollment({ programId, workspaceId, clientId, source, billing, priceCents, stripeSubscriptionId = null, stripeSessionId = null, status = 'active', currentPeriodEnd = null }) {
+export async function grantEnrollment({ programId, workspaceId, clientId, source, billing, priceCents, stripeSubscriptionId = null, stripeSessionId = null, status = 'active', currentPeriodEnd = null, expiresAt = null }) {
   const existing = await sql`
     SELECT id FROM program_enrollments
      WHERE program_id = ${programId} AND client_id = ${clientId}
@@ -116,13 +121,13 @@ export async function grantEnrollment({ programId, workspaceId, clientId, source
       UPDATE program_enrollments SET status = ${status}, source = ${source}, billing = ${billing}, price_cents = ${priceCents},
         stripe_subscription_id = COALESCE(${stripeSubscriptionId}, stripe_subscription_id),
         stripe_session_id = COALESCE(${stripeSessionId}, stripe_session_id),
-        current_period_end = ${currentPeriodEnd}, cancelled_at = CASE WHEN ${status} = 'cancelled' THEN NOW() ELSE NULL END, updated_at = NOW()
+        current_period_end = ${currentPeriodEnd}, expires_at = ${expiresAt}, cancelled_at = CASE WHEN ${status} = 'cancelled' THEN NOW() ELSE NULL END, updated_at = NOW()
        WHERE id = ${existing.rows[0].id}`;
     return existing.rows[0].id;
   }
   const ins = await sql`
-    INSERT INTO program_enrollments (program_id, workspace_id, client_id, source, billing, price_cents, stripe_subscription_id, stripe_session_id, status, current_period_end)
-    VALUES (${programId}, ${workspaceId}, ${clientId}, ${source}, ${billing}, ${priceCents}, ${stripeSubscriptionId}, ${stripeSessionId}, ${status}, ${currentPeriodEnd})
+    INSERT INTO program_enrollments (program_id, workspace_id, client_id, source, billing, price_cents, stripe_subscription_id, stripe_session_id, status, current_period_end, expires_at)
+    VALUES (${programId}, ${workspaceId}, ${clientId}, ${source}, ${billing}, ${priceCents}, ${stripeSubscriptionId}, ${stripeSessionId}, ${status}, ${currentPeriodEnd}, ${expiresAt})
     ON CONFLICT DO NOTHING RETURNING id`;
   return ins.rows[0]?.id || null;
 }
@@ -140,4 +145,20 @@ export async function applyProgramSubscription({ workspaceId, sub }) {
   const cpe = sub.current_period_end ? new Date(sub.current_period_end * 1000).toISOString() : null;
   await grantEnrollment({ programId: p.id, workspaceId, clientId: c.id, source: 'subscription', billing: p.billing, priceCents: p.price_cents, stripeSubscriptionId: sub.id, status, currentPeriodEnd: cpe });
   return 'applied';
+}
+
+// One-time access window → expiry timestamp (null = forever).
+export function expiryFor(program, from = new Date()) {
+  if (!program?.access_days || program.billing !== 'one_time') return null;
+  return new Date(from.getTime() + Number(program.access_days) * 86400_000).toISOString();
+}
+
+// Nightly sweep: one-time access that has run out. Subscriptions are
+// closed by the Stripe webhook, so only expires_at is handled here.
+export async function expireProgramAccess() {
+  const r = await sql`
+    UPDATE program_enrollments SET status = 'cancelled', cancelled_at = NOW(), updated_at = NOW()
+     WHERE status IN ('active','past_due') AND expires_at IS NOT NULL AND expires_at <= NOW()
+     RETURNING id`;
+  return r.rows.length;
 }

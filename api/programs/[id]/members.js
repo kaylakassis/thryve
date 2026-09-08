@@ -6,7 +6,7 @@ import { requireUser, validEmail } from '../../_lib/auth.js';
 import { ensureActiveWorkspace } from '../../_lib/workspaceGate.js';
 import { readBody } from '../../_lib/body.js';
 import { requireSameOrigin } from '../../_lib/security.js';
-import { grantEnrollment } from '../../_lib/programs.js';
+import { grantEnrollment, expiryFor } from '../../_lib/programs.js';
 import { badRequest, created, methodNotAllowed, notFound, ok, serverError } from '../../_lib/json.js';
 
 export default async function handler(req, res) {
@@ -32,7 +32,7 @@ export default async function handler(req, res) {
         clientId = existing?.id || (await sql`
           INSERT INTO clients (workspace_id, name, email, stage, source) VALUES (${workspaceId}, ${name}, ${email}, 'active', 'program') RETURNING id`).rows[0].id;
       }
-      const id = await grantEnrollment({ programId, workspaceId, clientId, source: 'manual', billing: p.billing, priceCents: 0 });
+      const id = await grantEnrollment({ programId, workspaceId, clientId, source: 'manual', billing: p.billing, priceCents: 0, expiresAt: expiryFor(p) });
       return created(res, { enrollmentId: id, clientId });
     }
     if (req.method === 'DELETE') {

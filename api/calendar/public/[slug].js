@@ -210,6 +210,17 @@ async function getCalendar(req, res) {
       expiryDays:   r.expiry_days == null ? null : Number(r.expiry_days),
     }));
 
+    // Published programs (courses, plans, paid communities) - bought from
+    // the booking page too; checkout is /api/programs/checkout.
+    let programsOut = [];
+    try {
+      const progs = await sql`
+        SELECT id, title, description, price_cents, billing, access_days, community_enabled,
+               (SELECT COUNT(*)::int FROM program_items i WHERE i.program_id = p.id AND i.deleted_at IS NULL) AS items
+          FROM programs p WHERE workspace_id = ${s.workspace_id} AND status = 'published' ORDER BY created_at ASC`;
+      programsOut = progs.rows.map((r) => ({ id: r.id, title: r.title, description: r.description || '', priceCents: Number(r.price_cents) || 0, billing: r.billing, accessDays: r.access_days == null ? null : Number(r.access_days), communityEnabled: !!r.community_enabled, items: r.items }));
+    } catch (e) { console.error('[calendar/public] programs skipped:', e.message); }
+
     return ok(res, {
       calendar: {
         settings: serializeSettings(s),
@@ -219,6 +230,7 @@ async function getCalendar(req, res) {
         reviews:  reviewSummary,
         memberships: membershipsOut,
         packages: packagesOut,
+        programs: programsOut,
         businessType,
         websiteHandle,
       },

@@ -3166,4 +3166,10 @@ CREATE TABLE IF NOT EXISTS program_posts (
   deleted_at TIMESTAMPTZ
 );
 CREATE INDEX IF NOT EXISTS idx_program_posts_program ON program_posts(program_id, created_at DESC);
+
+-- Access window for one-time programs (NULL = forever). Subscriptions end
+-- when Stripe says so; one-time access ends access_days after purchase.
+ALTER TABLE programs ADD COLUMN IF NOT EXISTS access_days INT CHECK (access_days IS NULL OR access_days > 0);
+ALTER TABLE program_enrollments ADD COLUMN IF NOT EXISTS expires_at TIMESTAMPTZ;
+CREATE INDEX IF NOT EXISTS idx_program_enrollments_expiry ON program_enrollments(expires_at) WHERE status = 'active' AND expires_at IS NOT NULL;
 `;
