@@ -22,6 +22,7 @@ export const NAV = [
   { id: 'calendar',  to: '/calendar',   label: 'Calendar',       icon: 'Calendar', section: 'Run', productOnlyHidden: true },
   { id: 'comms',     to: '/messages',   label: 'Messages',       icon: 'Chat',     section: 'Run' },
   { id: 'projects',  to: '/projects',   label: 'Projects',       icon: 'Doc',      section: 'Run' },
+  { id: 'programs',  to: '/programs',   label: 'Programs',       icon: 'Gift',     section: 'Run', accent: true },
   // Money.
   { id: 'finance',   to: '/finance',    label: 'Finance',        icon: 'Dollar',   section: 'Money' },
   // Grow.
@@ -69,6 +70,7 @@ export const TITLES = {
   dashboard: { title: 'Dashboard',     subtitle: 'Home' },
   clients:   { title: 'Clients',       subtitle: 'Your people' },
   projects:  { title: 'Projects',      subtitle: 'Engagements' },
+  programs:  { title: 'Programs',      subtitle: 'Courses, plans and paid communities' },
   calendar:  { title: 'Calendar',      subtitle: 'This week' },
   finance:   { title: 'Finance',       subtitle: 'Money in, money out' },
   goals:     { title: 'Goals & Tasks', subtitle: 'Stay on track' },
